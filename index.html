@@ -2129,7 +2129,7 @@ body {
         // ===== تعريف المستخدمين والصلاحيات =====
         const USERS = {
             "5674": {
-                name: "المدير",
+                name: "نصر العامري",
                 role: "admin",
                 permissions: {
                     editK: true,  // عمود K (إيرادات أخرى)
@@ -2143,7 +2143,7 @@ body {
                 }
             },
             "6785": {
-                name: "أمين الصندوق",
+                name: "سليمان الفرزعي",
                 role: "cashier",
                 permissions: {
                     editK: true,  // عمود K (إيرادات أخرى)
@@ -2157,7 +2157,7 @@ body {
                 }
             },
             "3452": {
-                name: "المحاسب",
+                name: "يوسف الحجاجي",
                 role: "accountant",
                 permissions: {
                     editK: false,  // عمود K (إيرادات أخرى)
@@ -2266,6 +2266,9 @@ body {
             // إخفاء شاشة الدخول بسلاسة
             loginScreen.classList.add("hidden");
             
+            // تشغيل الترحيب الصوتي حسب الصلاحية
+            playWelcomeMessage();
+            
             // بدء نظام PWA بعد الدخول
             setTimeout(() => {
                 initPWA();
@@ -2290,6 +2293,60 @@ body {
             setTimeout(() => {
                 dataManager.loadData(true);
             }, 1000);
+        }
+
+        // ===== دالة الترحيب الصوتي =====
+        function playWelcomeMessage() {
+            if (!('speechSynthesis' in window)) {
+                console.log('متصفحك لا يدعم التحدث الصوتي');
+                return;
+            }
+            
+            // إلغاء أي رسالة صوتية سابقة
+            speechSynthesis.cancel();
+            
+            let welcomeText = '';
+            
+            // تحديد نص الترحيب حسب الصلاحية
+            if (currentUser) {
+                switch(currentUser.role) {
+                    case "admin":
+                        welcomeText = "مرحبا بك نصر العامري مدير مشروع مياه السوفعي";
+                        break;
+                    case "accountant":
+                        welcomeText = "مرحبا بك يوسف الحجاجي محاسب مشروع مياه السوفعي";
+                        break;
+                    case "cashier":
+                        welcomeText = "مرحبا بك سليمان الفرزعي أمين صندوق مشروع مياه السوفعي";
+                        break;
+                    case "reader":
+                        welcomeText = "مرحبا بك قارئ عدادات مشروع مياه السوفعي";
+                        break;
+                    default:
+                        welcomeText = "مرحبا بك في نظام إدارة مياه السوفعي";
+                }
+            }
+            
+            // إنشاء رسالة صوتية
+            const speech = new SpeechSynthesisUtterance();
+            speech.text = welcomeText;
+            speech.lang = 'ar-SA'; // اللغة العربية السعودية
+            speech.rate = 1.0; // سرعة النطق
+            speech.pitch = 1.0; // طبقة الصوت
+            speech.volume = 1.0; // مستوى الصوت
+            
+            // بدء التحدث
+            speechSynthesis.speak(speech);
+            
+            // إضافة حدث عند انتهاء التحدث
+            speech.onend = function() {
+                console.log('تم تشغيل رسالة الترحيب الصوتية');
+            };
+            
+            // معالجة الأخطاء
+            speech.onerror = function(event) {
+                console.error('خطأ في التحدث الصوتي:', event);
+            };
         }
         
         function updateSidebarUserInfo() {
@@ -2342,6 +2399,9 @@ body {
         
         function logout() {
             if (confirm("هل أنت متأكد من تسجيل الخروج؟")) {
+                // إيقاف أي رسالة صوتية جارية
+                speechSynthesis.cancel();
+                
                 // مسح بيانات الجلسة
                 sessionStorage.removeItem("loggedIn");
                 sessionStorage.removeItem("currentUser");
@@ -5786,46 +5846,41 @@ body {
                     dataManager.loadData(true);
                 });
 
-                // زر إظهار المتأخرين
-                toggleLateBalancesBtn.addEventListener('click', () => {
-                    dataManager.toggleLateBalances();
-                });
+                refreshBtn.addEventListener('click', () => dataManager.loadData(true));
 
-                // ضبط الشهر الافتراضي
+                toggleLateBalancesBtn.addEventListener('click', () => dataManager.toggleLateBalances());
+
+                // تعيين الشهر الحالي افتراضياً
                 setDefaultMonth();
-                
-                // تحميل الإعدادات المحفوظة
-                const darkMode = localStorage.getItem('darkMode');
-                if (darkMode === 'enabled') {
-                    document.body.classList.add('dark-mode');
-                    darkModeBtn
-                    .innerHTML = '<i class="fas fa-sun"></i> الوضع الفاتح';
-                    darkModeBtn.style.backgroundColor = '#ffc107';
+
+                // تحميل البيانات الأولية
+                if (currentUser) {
+                    setTimeout(() => {
+                        dataManager.loadData(false);
+                    }, 1500);
                 }
-                
-                const highContrast = localStorage.getItem('highContrast');
-                if (highContrast === 'enabled') {
-                    document.body.classList.add('high-contrast');
-                    contrastBtn.innerHTML = '<i class="fas fa-adjust"></i> الوضع الطبيعي';
-                    contrastBtn.style.backgroundColor = '#343a40';
-                }
-                
-                // تهيئة التعرف الصوتي
-                VoiceRecognition.init();
-                
-                // تسجيل وقت البدء
+
+                // تحديث بيانات تقرير القرى الشهري
+                fetchMonthlyReportData();
+
+                // تحسين الأداء
+                setTimeout(() => {
+                    updatePerformanceStats();
+                    memoryMonitor.startMonitoring();
+                }, 3000);
+
                 const endTime = performance.now();
-                console.log(`✅ التطبيق جاهز في ${Math.round(endTime - startTime)}ms`);
-                
-                // تحديث إحصائيات الأداء
-                updatePerformanceStats();
-                
+                console.log(`⏱️ وقت تحميل النظام: ${Math.round(endTime - startTime)} مللي ثانية`);
+
             } catch (error) {
-                console.error('خطأ في تهيئة التطبيق:', error);
-                ErrorLogger.log(error, { action: 'appInitialization' });
-                showToast('حدث خطأ في تهيئة التطبيق', 'error');
+                console.error('❌ خطأ في تهيئة النظام:', error);
+                ErrorLogger.log(error, { action: 'initialization' });
+                showToast('حدث خطأ في تهيئة النظام. يرجى تحديث الصفحة.', 'error');
             }
         });
+
     </script>
+
 </body>
+
 </html>
